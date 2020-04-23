@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="InitalizeAppOffline">
+    <!-- 
+    This property needs to be declared inside of target because this is imported before
+    the MSDeployPath property is defined as well as others -->
+    <PropertyGroup>
+      <MSDeployExe Condition=" '$(MSDeployExe)'=='' ">$(MSDeployPath)msdeploy.exe</MSDeployExe>
+    </PropertyGroup>    
+  </Target>
+
+  <PropertyGroup>
+    <PublishAppOfflineToDest>
+      InitalizeAppOffline;
+    </PublishAppOfflineToDest>
+  </PropertyGroup>
+
+  <!--
+    %msdeploy% 
+      -verb:sync 
+      -source:contentPath="C:\path\to\app_offline-template.htm" 
+      -dest:contentPath="Default Web Site/AppOfflineDemo/app_offline.htm"
+  -->
+
+  <!--***********************************************************************
+  Make sure app_offline-template.htm gets published as app_offline.htm
+  ***************************************************************************-->
+  <Target Name="PublishAppOfflineToDest" 
+          BeforeTargets="MSDeployPublish" 
+          DependsOnTargets="$(PublishAppOfflineToDest)">
+    <ItemGroup>
+      <_AoPubAppOfflineSourceProviderSetting Include="contentPath">
+        <Path>$(MSBuildProjectDirectory)\app_offline-template.htm</Path>
+        <EncryptPassword>$(DeployEncryptKey)</EncryptPassword>
+        <WebServerAppHostConfigDirectory>$(_MSDeploySourceWebServerAppHostConfigDirectory)</WebServerAppHostConfigDirectory>
+        <WebServerManifest>$(_MSDeploySourceWebServerManifest)</WebServerManifest>
+        <WebServerDirectory>$(_MSDeploySourceWebServerDirectory)</WebServerDirectory>
+      </_AoPubAppOfflineSourceProviderSetting>
+
+      <_AoPubAppOfflineDestProviderSetting Include="contentPath">
+        <Path>"$(DeployIisAppPath)/app_offline.htm"</Path>
+        <ComputerName>$(_PublishMsDeployServiceUrl)</ComputerName>
+        <UserName>$(UserName)</UserName>
+        <Password>$(Password)</Password>
+        <EncryptPassword>$(DeployEncryptKey)</EncryptPassword>
+        <IncludeAcls>False</IncludeAcls>
+        <AuthType>$(AuthType)</AuthType>
+        <WebServerAppHostConfigDirectory>$(_MSDeployDestinationWebServerAppHostConfigDirectory)</WebServerAppHostConfigDirectory>
+        <WebServerManifest>$(_MSDeployDestinationWebServerManifest)</WebServerManifest>
+        <WebServerDirectory>$(_MSDeployDestinationWebServerDirectory)</WebServerDirectory>
+      </_AoPubAppOfflineDestProviderSetting>
+    </ItemGroup>
+
+    <MSdeploy
+		MSDeployVersionsToTry="$(_MSDeployVersionsToTry)"
+          Condition="$(UseMsdeployExe)"
+          Verb="sync"
+          Source="@(_AoPubAppOfflineSourceProviderSetting)"
+          Destination="@(_AoPubAppOfflineDestProviderSetting)"
+			DisableLink="$(PackageDisableLinks)"
+          EnableRule="DoNotDeleteRule"
+          AllowUntrusted="$(AllowUntrustedCertificate)"
+          RetryAttempts="$(RetryAttemptsForDeployment)"
+          SimpleSetParameterItems="@(_AoArchivePublishSetParam)"
+          ExePath="$(MSDeployPath)" />
+  </Target>
+
+  <!--***********************************************************************
+  Make sure app_offline-template.htm gets published as app_offline.htm
+  ***************************************************************************-->
+  <!-- We need to create a replace rule for app_offline-template.htm->app_offline.htm for when the app get's published -->
+  <ItemGroup>
+    <!-- Make sure not to include this file if a package is being created, so condition this on publishing -->
+    <FilesForPackagingFromProject Include="app_offline-template.htm">
+      <DestinationRelativePath>app_offline.htm</DestinationRelativePath>
+    </FilesForPackagingFromProject>
+
+    <!-- This will prevent app_offline-template.htm from being published -->
+    <MsDeploySkipRules Include="SkipAppOfflineTemplate">
+      <ObjectName>filePath</ObjectName>
+      <AbsolutePath>app_offline-template.htm</AbsolutePath>
+    </MsDeploySkipRules>
+  </ItemGroup>
+
+</Project>
